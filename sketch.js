@@ -1,10 +1,10 @@
 let map_data = `
 01234567890
-1degggdttt1
+1dggggdttt1
 2mgwwwgddr2
 3dgggtddgg3
 4drgmmrtgd4
-5ddtmmmrrm5
+5ddtmmmerm5
 6dtmmtggdd6
 71234567897
 `;
@@ -261,6 +261,7 @@ class SearchNode {
     this.action = action;
     this.x = this.state.x;
     this.y = this.state.y;
+    this.o = this.state.o;
     this.good = true;
     if (parent) {
       this.g = parent.g + state.cost();
@@ -294,6 +295,9 @@ class SearchNode {
     }
     path.push(node);
     return path.reverse();
+  }
+  key(){
+    return this.x+"-"+this.y+"-"+this.o
   }
 }
 
@@ -372,8 +376,8 @@ class Explorer {
     st += node.x + "," + node.y;
     // fill(0, 0, 0);
     if (children.length == 0) {
-      st += " <em>(g: " + node.g + ")</em> ";
-      // st += ' <em>(g: ' + node.g + ', h: ' + node.h + ', f: '+node.f+')</em> ';
+      //st += " <em>(g: " + node.g + ")</em> ";
+      st += ' <em>(g: ' + node.g + ', h: ' + node.h + ', f: '+node.f+')</em> ';
       fill(0, 255, 0);
     }
     st += "</div><ul>";
@@ -447,38 +451,58 @@ function startButton() {
     console.log(input.value());
     explorer.renderSearchTree();
     let start = new SearchNode(state, null, null);
-    Ans = new Explorer(start);
-    newans = GraphSearch(Ans);
-    //console.log(newans)
+    node = GraphSearch(start);
+    // while(node.parent != null){
+    //   console.log(node.parent);
+    //   node = node.parent
+    // }
   }
 }
 
-function GraphSearch(problem) {
-  fronteir = [];
-  explored = [];
-  fronteir.push(problem.root.node);
-  var priorityQueue = new PriorityQueue();
-  for (let i = 0; i < problem.root.children.length; i++) {
-    //onsole.log(problem.root.children[i].node)
-    priorityQueue.enqueue(
-      problem.root.children[i].node,
-      problem.root.children[i].node.h
-    );
-    //fronteir.push(problem.root.children[i].node);
-  }
-  console.log(priorityQueue);
-  for(let i=0 ; i<priorityQueue.items.length;i++){
-    fronteir.push(priorityQueue.front().element)
-    priorityQueue.enqueue(priorityQueue.front().element)
-  }
-  console.log(fronteir)
+async function GraphSearch(problem) {
+  frontier = new PriorityQueue();
+  frontier.enqueue(problem, problem.g)
+  frontier_count = 1;
+  console.log(frontier.items)
+  explored = {}
+  
   while (true) {
-    if (fronteir.length == 0) return false;
-    explored.push(problem.root.children[1]);
+    if (frontier.isEmpty()) return false;
+    let choose = frontier.dequeue().element;
+    //console.log(choose)
+    if(choose.x == map.goal.x && choose.y == map.goal.y) {
+      console.log(explored)
+      console.log(Object.keys(explored))
+      //console.log(frontier_count)
+      return choose;
+    }
+    explored[choose.key()]=true;
+    let actions = choose.state.actions();
 
-    break;
-    //explored.push(fronteir.children)
+    for(let i=0; i < actions.length; i++){
+      let child = choose.state.transition(actions[i]);
+      let childNode = new SearchNode(child, choose, actions[i])
+      //console.log(childNode.key())
+      if(childNode.key() in explored) continue
+
+      if(!frontier.items.includes(childNode)){
+        frontier_count += 1;
+        console.log(frontier_count)
+        frontier.enqueue(childNode, childNode.g)
+      }
+      else if(frontier.items.include(childNode)){
+        console.log("In")
+        frontier.insertG(childNode)
+      }
+    }
+    await timeout(50);
   }
+}
+
+function timeout(ms) {
+
+  return new Promise(resolve => setTimeout(resolve,ms));
+
 }
 
 class QElement {
@@ -538,6 +562,17 @@ class PriorityQueue {
   {
       // return true if the queue is empty.
       return this.items.length == 0;
+  }
+  insertG(object){
+    for (var i = 0; i < this.items.length; i++) {
+      console.log(object)
+      console.log(this.items[i].priority)
+      if(object.x == this.items[i].x && object.y == this.items[i].y && object.g < this.items[i].g){
+        this.items[i] = object
+      }
+    }
+    console.log(this.items  )
+    return this.items
   }
   // printPQueue()
 }
