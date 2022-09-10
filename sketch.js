@@ -458,36 +458,22 @@ function startButton() {
   button1.mousePressed(startExplorer);
 
   function startExplorer() {
-    console.log(input1.value());
-    if (input1.value() == "UCS") {
-      let start = new SearchNode(state, null, null, null);
-      node = GraphSearch(start);
-    } else if (input1.value() == "Greedy") {
-      if (input.value() == "Euclidean") {
-        let start = new SearchNode(state, null, null, "Euclidean");
-        node = GreedySearch(start);
-      } else {
-        let start = new SearchNode(state, null, null, "Manhattan");
-        node = GreedySearch(start);
-      }
-    } else if (input1.value() == "A*") {
-      if (input.value() == "Euclidean") {
-        let start = new SearchNode(state, null, null, "Euclidean");
-        node = AstarSearch(start);
-      } else {
-        let start = new SearchNode(state, null, null, "Manhattan");
-        node = AstarSearch(start);
-      }
-    }
+    node = GraphSearch(new SearchNode(state, null, null, input.value()), input1.value());
   }
 }
 
-// START UCS SEARCH ALGORITHM
-async function GraphSearch(problem) {
+// START SEARCH ALGORITHM
+async function GraphSearch(problem, ALGORITHM) {
+  console.log(problem, ALGORITHM)
   //Initialize the frontier  using the initlal state of the problem
   frontier = new PriorityQueue();
-  frontier.enqueue(problem, problem.g);
-  frontier0 = new PriorityQueue();
+  if(ALGORITHM == 'UCS'){
+    frontier.enqueue(problem, problem.g);
+  }else if (ALGORITHM == 'Greedy'){
+    frontier.enqueue(problem, problem.h);
+  }else{
+    frontier.enqueue(problem, problem.f);
+  }
   frontier_count = 0
   //Initialize the explored set to be empty
   explored = {};
@@ -497,6 +483,7 @@ async function GraphSearch(problem) {
   //if the fronteir is empty return failure 
   while (!frontier.isEmpty()) {
     //choose a leaf node and remove it from frontier
+    frontier_count += 1
     let chosenNode = frontier.dequeue().element;
 
     let xpos = chosenNode.x * cz + mz;
@@ -506,8 +493,6 @@ async function GraphSearch(problem) {
 
     //if the node contain a goal state then return solution
     if (chosenNode.x == map.goal.x && chosenNode.y == map.goal.y) {
-      //console.log(Object.keys(explored));
-      //console.log(frontier_count);
       st +=
         "</div>" +
         "<h3>Explored: " +
@@ -533,150 +518,31 @@ async function GraphSearch(problem) {
     for (let i = 0; i < actions.length; i++) {
       let child = chosenNode.state.transition(actions[i]);
       let childNode = new SearchNode(child, chosenNode, actions[i]);
-      //if in explored set not added
       if (childNode.key() in explored) {
         continue;
       }
-      //if in frontier keep the better node, that contain same state
-      //console.log(frontier.items)
-      if (!frontier.checkContain(childNode)) {
-        frontier.enqueue(childNode, childNode.g);
-        frontier_count += 1;
-      } else {
-        console.log("in")
-        frontier.checkValue(childNode);
+
+      if (!frontier.items.includes(childNode)) {
+        if(ALGORITHM == 'UCS'){
+          frontier.enqueue(childNode, childNode.g);
+        }else if (ALGORITHM == 'Greedy'){
+          frontier.enqueue(childNode, childNode.h);
+        }else{
+          frontier.enqueue(childNode, childNode.f);
+        }
+      } else if (frontier.items.include(childNode)) {
+        if(ALGORITHM == 'UCS'){
+          frontier.insertG(childNode);
+        }else if (ALGORITHM == 'Greedy'){
+          frontier.insertH(childNode);
+        }else{
+          frontier.insertF(childNode);
+        }
       }
     }
     await timeout(50);
   }
   return false;
-}
-// END SEARCH ALGORITHM
-
-// START GREEDY ALGORITHM
-async function GreedySearch(problem) {
-  frontier = new PriorityQueue();
-  console.log(frontier.items);
-  frontier.enqueue(problem, problem.h);
-  frontier_count = 1;
-  console.log(problem);
-  console.log(frontier.items);
-  explored = {};
-  st = "";
-
-  while (true) {
-    if (frontier.isEmpty()) return false;
-    let choose = frontier.dequeue().element;
-
-    let xpos = choose.x * cz + mz;
-    let ypos = choose.y * cz + mz;
-    
-    circle(xpos + cz / 2, ypos + cz / 2, 10);
-    
-    if (choose.x == map.goal.x && choose.y == map.goal.y) {
-      console.log(explored);
-      console.log(Object.keys(explored));
-      console.log(frontier_count);
-      st +=
-        "<h3>Explored: " +
-        Object.keys(explored).length +
-        " | Frontier: " +
-        frontier_count +
-        "</h3>";
-      history.splice(0, history.length);
-      let nodes = choose.get_path_nodes();
-      for (let i = 0; i < nodes.length; i++) {
-        history.push(nodes[i]);
-      }
-      redraw();
-      divSearchTree.html(st);
-      return choose;
-    }
-
-    explored[choose.key()] = true;
-    let actions = choose.state.actions();
-
-    for (let i = 0; i < actions.length; i++) {
-      let child = choose.state.transition(actions[i]);
-      let childNode = new SearchNode(child, choose, actions[i]);
-      //console.log(childNode.key())
-      if (childNode.key() in explored) {
-        continue;
-      }
-
-      if (!frontier.items.includes(childNode)) {
-        frontier_count += 1;
-        frontier.enqueue(childNode, childNode.h);
-      } else if (frontier.items.include(childNode)) {
-        frontier.insertH(childNode);
-      }
-    }
-    await timeout(50);
-  }
-}
-// END SEARCH ALGORITHM
-
-// START ASTAR ALGORITHM
-async function AstarSearch(problem) {
-  frontier = new PriorityQueue();
-  console.log(frontier.items);
-  frontier.enqueue(problem, problem.f);
-  frontier_count = 1;
-  console.log(problem);
-  console.log(frontier.items);
-  explored = {};
-  st = "";
-
-  while (true) {
-    if (frontier.isEmpty()) return false;
-    let choose = frontier.dequeue().element;
-
-    let xpos = choose.x * cz + mz;
-    let ypos = choose.y * cz + mz;
-    
-    circle(xpos + cz / 2, ypos + cz / 2, 10);
-    
-    
-    if (choose.x == map.goal.x && choose.y == map.goal.y) {
-      console.log(explored);
-      console.log(Object.keys(explored));
-      console.log(frontier_count);
-      st +=
-        "<h3>Explored: " +
-        Object.keys(explored).length +
-        " | Frontier: " +
-        frontier_count +
-        "</h3>";
-      history.splice(0, history.length);
-      let nodes = choose.get_path_nodes();
-      for (let i = 0; i < nodes.length; i++) {
-        history.push(nodes[i]);
-      }
-      redraw();
-      divSearchTree.html(st);
-      return choose;
-    }
-
-    explored[choose.key()] = true;
-    let actions = choose.state.actions();
-
-    for (let i = 0; i < actions.length; i++) {
-      let child = choose.state.transition(actions[i]);
-      let childNode = new SearchNode(child, choose, actions[i]);
-      //console.log(childNode.key())
-      if (childNode.key() in explored) {
-        continue;
-      }
-
-      if (!frontier.items.includes(childNode)) {
-        frontier_count += 1;
-        frontier.enqueue(childNode, childNode.f);
-      } else if (frontier.items.include(childNode)) {
-        frontier.insertF(childNode);
-      }
-    }
-    await timeout(50);
-  }
 }
 // END SEARCH ALGORITHM
 
@@ -759,6 +625,21 @@ class PriorityQueue {
     return false ;
   }
 
+  insertG(object) {
+    for (var i = 0; i < this.items.length; i++) {
+      console.log(object);
+      console.log(this.items[i].priority);
+      if (
+        object.x == this.items[i].x &&
+        object.y == this.items[i].y &&
+        object.g < this.items[i].g
+      ) {
+        this.items[i] = object;
+      }
+    }
+    console.log(this.items);
+    return this.items;
+  }
 
   insertH(object) {
     for (var i = 0; i < this.items.length; i++) {
