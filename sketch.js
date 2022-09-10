@@ -188,9 +188,12 @@ class AgentState {
     return Math.sqrt(Math.pow(x0 - x1, 2) + Math.pow(y0 - y1, 2));
   }
 
-  heuristic() {
-    // return this.euclidean(this.x, this.y, map.goal.x, map.goal.y);
-    return this.manhattan(this.x, this.y, map.goal.x, map.goal.y);
+  heuristic(heuristic_type) {
+    if (heuristic_type == "Euclidean") {
+      return this.euclidean(this.x, this.y, map.goal.x, map.goal.y);
+    } else {
+      return this.manhattan(this.x, this.y, map.goal.x, map.goal.y);
+    }
   }
 
   render() {
@@ -219,25 +222,21 @@ function renderHistory() {
   let totalE = 0;
   for (let i = 0; i < history.length; i++) {
     if (history[i].action) {
-      if (history[i].action == "l") his += "<li> Turn Left ->";
-      else if (history[i].action == "r") his += "<li> Turn Right -> ";
-      else if (history[i].action == "f") his += "<li> Move -> ";
+      his += "<li> " + history[i].action + "-> ";
     } else {
-      his += "<li> Start -> ";
+      his += "<li> S -> ";
     }
     his +=
-      "((" +
+      "" +
       history[i].state.x +
       "," +
       history[i].state.y +
-      "), " +
-      history[i].state.o.toString().toUpperCase() +
-      ")";
+      "," +
+      history[i].state.o;
 
-    if (history[i].action == "f") {
-      his += "| E: " + history[i].state.cost();
-      totalE += history[i].state.cost();
-    }
+    his += " | energy: " + history[i].state.cost();
+    totalE += history[i].state.cost();
+
     if (map.data[history[i].state.y][history[i].state.x] == "e") {
       his += " |🏁";
     }
@@ -255,10 +254,11 @@ function renderHistory() {
 }
 
 class SearchNode {
-  constructor(state, parent, action) {
+  constructor(state, parent, action, heuristic_type) {
     this.state = state;
     this.parent = parent;
     this.action = action;
+    this.heuristic_type = heuristic_type;
     this.x = this.state.x;
     this.y = this.state.y;
     this.o = this.state.o;
@@ -268,7 +268,7 @@ class SearchNode {
     } else {
       this.g = state.cost();
     }
-    this.h = state.heuristic();
+    this.h = state.heuristic(heuristic_type);
     this.f = this.g + this.h;
   }
 
@@ -296,8 +296,8 @@ class SearchNode {
     path.push(node);
     return path.reverse();
   }
-  key(){
-    return this.x+"-"+this.y+"-"+this.o
+  key() {
+    return this.x + "-" + this.y + "-" + this.o;
   }
 }
 
@@ -314,7 +314,7 @@ class Explorer {
     children.splice(0, children.length);
     for (let i = 0; i < actions.length; i++) {
       let child = node.state.transition(actions[i]);
-      let childNode = new SearchNode(child, node, actions[i]);
+      let childNode = new SearchNode(child, node, actions[i], null);
 
       children.push({ node: childNode, children: [] });
     }
@@ -323,13 +323,13 @@ class Explorer {
   explorer(key) {
     let d = this.data[key];
     this.expand(d.node, d.children);
-    history.splice(0, history.length);
-    let nodes = d.node.get_path_nodes();
-    for (let i = 0; i < nodes.length; i++) {
-      history.push(nodes[i]);
-    }
-    state = history[history.length - 1].state;
-    redraw();
+    //history.splice(0, history.length);
+    //et nodes = d.node.get_path_nodes();
+    // for (let i = 0; i < nodes.length; i++) {
+    //   history.push(nodes[i]);
+    // }
+    //state = history[history.length - 1].state;
+    //redraw();
     this.renderSearchTree();
   }
 
@@ -377,7 +377,8 @@ class Explorer {
     // fill(0, 0, 0);
     if (children.length == 0) {
       //st += " <em>(g: " + node.g + ")</em> ";
-      st += ' <em>(g: ' + node.g + ', h: ' + node.h + ', f: '+node.f+')</em> ';
+      st +=
+        " <em>(g: " + node.g + ", h: " + node.h + ", f: " + node.f + ")</em> ";
       fill(0, 255, 0);
     }
     st += "</div><ul>";
@@ -404,7 +405,7 @@ let divSearchTree;
 function preload() {
   map = new WorldMap(map_data);
   state = new AgentState(1, 1, "s");
-  let start = new SearchNode(state, null, null);
+  let start = new SearchNode(state, null, null, null);
   history.push(start);
   explorer = new Explorer(start);
 }
@@ -435,11 +436,11 @@ function startButton() {
   aiMode = createElement("p", "AI MODE :");
   aiMode.position(10, cz * map.rows + mz * 2 - 5);
   input = createSelect();
-  input.position(90, cz * map.rows + mz * 2 + 10);
+  input.position(180, cz * map.rows + mz * 2 + 10);
   input.option("Euclidean");
   input.option("Manhattan");
   input1 = createSelect();
-  input1.position(190, cz * map.rows + mz * 2 + 10);
+  input1.position(100, cz * map.rows + mz * 2 + 10);
   input1.option("UCS");
   input1.option("Greedy");
   input1.option("A*");
@@ -448,51 +449,205 @@ function startButton() {
   button1.mousePressed(startExplorer);
 
   function startExplorer() {
-    console.log(input.value());
-    explorer.renderSearchTree();
-    let start = new SearchNode(state, null, null);
-    node = GraphSearch(start);
-    // while(node.parent != null){
-    //   console.log(node.parent);
-    //   node = node.parent
-    // }
+    console.log(input1.value());
+    if (input1.value() == "UCS") {
+      let start = new SearchNode(state, null, null, null);
+      node = GraphSearch(start);
+    } else if (input1.value() == "Greedy") {
+      if (input.value() == "Euclidean") {
+        let start = new SearchNode(state, null, null, "Euclidean");
+        node = GreedySearch(start);
+      } else {
+        let start = new SearchNode(state, null, null, "Manhattan");
+        node = GreedySearch(start);
+      }
+    } else if (input1.value() == "A*") {
+      if (input.value() == "Euclidean") {
+        let start = new SearchNode(state, null, null, "Euclidean");
+        node = AstarSearch(start);
+      } else {
+        let start = new SearchNode(state, null, null, "Manhattan");
+        node = AstarSearch(start);
+      }
+    }
   }
 }
 
 async function GraphSearch(problem) {
+  //Initialize the frontier  using the initlal state of the problem
   frontier = new PriorityQueue();
-  frontier.enqueue(problem, problem.g)
+  frontier.enqueue(problem, problem.g);
+  frontier0 = new PriorityQueue();
+  frontier_count = 0
+  //Initialize the explored set to be empty
+  explored = {};
+
+  st = "";
+  state = new AgentState(1, 1, "s");
+  historyWalk = [];
+
+  //loop do
+  while (!frontier.isEmpty()) {
+    //if the fronteir is empty return failure
+    //choose a leaf node and remove it from frontier
+    //console.log(frontier.printPQueue());
+    let chosenNode = frontier.dequeue().element;
+    //if the node contain a goal state then return solution
+    if (chosenNode.x == map.goal.x && chosenNode.y == map.goal.y) {
+      //console.log(Object.keys(explored));
+      //console.log(frontier_count);
+      st +=
+        "</div>" +
+        "<h3>Explored: " +
+        Object.keys(explored).length +
+        " | Frontier: " +
+        frontier_count +
+        "</h3>";
+      history.splice(0, history.length);
+      let nodes = chosenNode.get_path_nodes();
+      for (let i = 0; i < nodes.length; i++) {
+        history.push(nodes[i]);
+      }
+      redraw();
+      divSearchTree.html(st);
+      return chosenNode;
+    }
+    //add the node to the explored set
+    explored[chosenNode.key()] = true;
+
+    //expand the chosen node
+    let actions = chosenNode.state.actions();
+    for (let i = 0; i < actions.length; i++) {
+      let child = chosenNode.state.transition(actions[i]);
+      let childNode = new SearchNode(child, chosenNode, actions[i]);
+      //if in explored set not added
+      if (childNode.key() in explored) {
+        continue;
+      }
+      //console.log(frontier.items, childNode)
+      //if in frontier keep the better node, that contain same state
+      //console.log(frontier.checkDupeChild(childNode))
+      if (frontier.checkDupeChild(childNode)) {
+          //console.log("dupe")
+        if(frontier.checkG(childNode)){
+          frontier = frontier.bringLowtoFront()
+          frontier.dequeue();
+        }
+      } else {
+        console.log("not dupe")
+        frontier.enqueue(childNode, childNode.g);
+        frontier_count += 1;
+      }
+    }
+    await timeout(50);
+  }
+  return false;
+}
+
+async function GreedySearch(problem) {
+  frontier = new PriorityQueue();
+  console.log(frontier.items);
+  frontier.enqueue(problem, problem.h);
   frontier_count = 1;
-  console.log(frontier.items)
-  explored = {}
-  
+  console.log(problem);
+  console.log(frontier.items);
+  explored = {};
+  st = "";
+
   while (true) {
     if (frontier.isEmpty()) return false;
     let choose = frontier.dequeue().element;
-    //console.log(choose)
-    if(choose.x == map.goal.x && choose.y == map.goal.y) {
-      console.log(explored)
-      console.log(Object.keys(explored))
-      //console.log(frontier_count)
+    if (choose.x == map.goal.x && choose.y == map.goal.y) {
+      console.log(explored);
+      console.log(Object.keys(explored));
+      console.log(frontier_count);
+      st +=
+        "<h3>Explored: " +
+        Object.keys(explored).length +
+        " | Frontier: " +
+        frontier_count +
+        "</h3>";
+      history.splice(0, history.length);
+      let nodes = choose.get_path_nodes();
+      for (let i = 0; i < nodes.length; i++) {
+        history.push(nodes[i]);
+      }
+      redraw();
+      divSearchTree.html(st);
       return choose;
     }
-    explored[choose.key()]=true;
+
+    explored[choose.key()] = true;
     let actions = choose.state.actions();
 
-    for(let i=0; i < actions.length; i++){
+    for (let i = 0; i < actions.length; i++) {
       let child = choose.state.transition(actions[i]);
-      let childNode = new SearchNode(child, choose, actions[i])
+      let childNode = new SearchNode(child, choose, actions[i]);
       //console.log(childNode.key())
-      if(childNode.key() in explored) continue
-
-      if(!frontier.items.includes(childNode)){
-        frontier_count += 1;
-        console.log(frontier_count)
-        frontier.enqueue(childNode, childNode.g)
+      if (childNode.key() in explored) {
+        continue;
       }
-      else if(frontier.items.include(childNode)){
-        console.log("In")
-        frontier.insertG(childNode)
+
+      if (!frontier.items.includes(childNode)) {
+        frontier_count += 1;
+        frontier.enqueue(childNode, childNode.h);
+      } else if (frontier.items.include(childNode)) {
+        frontier.insertH(childNode);
+      }
+    }
+    await timeout(50);
+  }
+}
+
+async function AstarSearch(problem) {
+  frontier = new PriorityQueue();
+  console.log(frontier.items);
+  frontier.enqueue(problem, problem.f);
+  frontier_count = 1;
+  console.log(problem);
+  console.log(frontier.items);
+  explored = {};
+  st = "";
+
+  while (true) {
+    if (frontier.isEmpty()) return false;
+    let choose = frontier.dequeue().element;
+    if (choose.x == map.goal.x && choose.y == map.goal.y) {
+      console.log(explored);
+      console.log(Object.keys(explored));
+      console.log(frontier_count);
+      st +=
+        "<h3>Explored: " +
+        Object.keys(explored).length +
+        " | Frontier: " +
+        frontier_count +
+        "</h3>";
+      history.splice(0, history.length);
+      let nodes = choose.get_path_nodes();
+      for (let i = 0; i < nodes.length; i++) {
+        history.push(nodes[i]);
+      }
+      redraw();
+      divSearchTree.html(st);
+      return choose;
+    }
+
+    explored[choose.key()] = true;
+    let actions = choose.state.actions();
+
+    for (let i = 0; i < actions.length; i++) {
+      let child = choose.state.transition(actions[i]);
+      let childNode = new SearchNode(child, choose, actions[i]);
+      //console.log(childNode.key())
+      if (childNode.key() in explored) {
+        continue;
+      }
+
+      if (!frontier.items.includes(childNode)) {
+        frontier_count += 1;
+        frontier.enqueue(childNode, childNode.f);
+      } else if (frontier.items.include(childNode)) {
+        frontier.insertF(childNode);
       }
     }
     await timeout(50);
@@ -500,12 +655,10 @@ async function GraphSearch(problem) {
 }
 
 function timeout(ms) {
-
-  return new Promise(resolve => setTimeout(resolve,ms));
-
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-class QElement {
+class QElement {  
   constructor(element, priority) {
     this.element = element;
     this.priority = priority;
@@ -514,65 +667,115 @@ class QElement {
 
 // PriorityQueue class
 class PriorityQueue {
-  // An array is used to implement priority
   constructor() {
     this.items = [];
   }
-  // functions to be implemented
 
   enqueue(element, priority) {
-    // creating object from queue element
     var qElement = new QElement(element, priority);
     var contain = false;
 
-    // iterating through the entire
-    // item array to add element at the
-    // correct location of the Queue
     for (var i = 0; i < this.items.length; i++) {
       if (this.items[i].priority > qElement.priority) {
-        // Once the correct location is found it is
-        // enqueued
         this.items.splice(i, 0, qElement);
         contain = true;
         break;
       }
     }
 
-    // if the element have the highest priority
-    // it is added at the end of the queue
     if (!contain) {
       this.items.push(qElement);
     }
   }
+
   dequeue() {
-    // return the dequeued element
-    // and remove it.
-    // if the queue is empty
-    // returns Underflow
     if (this.isEmpty()) return "Underflow";
     return this.items.shift();
   }
+
   front() {
-    // returns the highest priority element
-    // in the Priority queue without removing it.
     if (this.isEmpty()) return "No elements in Queue";
     return this.items[0];
   }
-  isEmpty()
-  {
-      // return true if the queue is empty.
-      return this.items.length == 0;
+
+  isEmpty() {
+    return this.items.length == 0;
   }
-  insertG(object){
+  checkDupeChild(child){
+    //console.log(child, this.items[0].element)
     for (var i = 0; i < this.items.length; i++) {
-      console.log(object)
-      console.log(this.items[i].priority)
-      if(object.x == this.items[i].x && object.y == this.items[i].y && object.g < this.items[i].g){
-        this.items[i] = object
+      //console.log(this.items[i].element, child);
+      if (this.items[i].element.x == child.x && this.items[i].element.y == child.y && this.items[i].element.o == child.o) return true
+    }
+    return false;
+  }
+
+  checkG(object) {
+    for (var i = 0; i < this.items.length; i++) {
+      if (
+        object.x == this.items[i].x &&
+        object.y == this.items[i].y &&
+        object.o == this.items[i].o &&
+        object.g < this.items[i].g
+      ) {
+        console.log("Lower")
+        return true
       }
     }
-    console.log(this.items  )
-    return this.items
+    return false ;
   }
-  // printPQueue()
+
+  bringLowtoFront(object) {
+    console.log(object)
+    for (var i = 0; i < this.items.length; i++) {
+      if (
+        object.x == this.items[i].x &&
+        object.y == this.items[i].y &&
+        object.o == this.items[i].o &&
+        object.g < this.items[i].g
+      ) {
+        this.items[i].priority = 0;
+      }
+    }
+    console.log(this.items)
+    return this.items ;
+  }
+
+  insertH(object) {
+    for (var i = 0; i < this.items.length; i++) {
+      console.log(object);
+      console.log(this.items[i].priority);
+      if (
+        object.x == this.items[i].x &&
+        object.y == this.items[i].y &&
+        object.h < this.items[i].h
+      ) {
+        this.items[i] = object;
+      }
+    }
+    console.log(this.items);
+    return this.items;
+  }
+  insertF(object) {
+    for (var i = 0; i < this.items.length; i++) {
+      console.log(object);
+      console.log(this.items[i].priority);
+      if (
+        object.x == this.items[i].x &&
+        object.y == this.items[i].y &&
+        object.f < this.items[i].f
+      ) {
+        this.items[i] = object;
+      }
+    }
+    console.log(this.items);
+    return this.items;
+  }
+  printPQueue() 
+  { 
+    var str = ""; 
+    for (var i = 0; i < this.items.length; i++) 
+        str += "("+this.items[i].element.x + "-" + this.items[i].element.y + "-" + this.items[i].element.o + "-"+ this.items[i].element.g+") " ; 
+    return str; 
+  } 
 }
