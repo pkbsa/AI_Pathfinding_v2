@@ -149,6 +149,7 @@ class AgentState {
     return map.costs[tile];
   }
 
+  // START FORMULATION 2: ACTION SPACE
   transition(action) {
     let x = this.x;
     let y = this.y;
@@ -179,15 +180,21 @@ class AgentState {
       return new AgentState(this.x, this.y, o, this.assets);
     }
   }
+  // END FORMULATION 2
 
+  // START HEURISTIC FUNCTION 1
   manhattan(x0, y0, x1, y1) {
     return Math.abs(x0 - x1) + Math.abs(y0 - y1);
   }
+  // END HEURISTIC FUNCTION 1
 
+  // START HEURISTIC FUNCTION 2
   euclidean(x0, y0, x1, y1) {
     return Math.sqrt(Math.pow(x0 - x1, 2) + Math.pow(y0 - y1, 2));
   }
+  // END HEURISTIC FUNCTION 2
 
+  //CHECK HEURISTIC TYPE
   heuristic(heuristic_type) {
     if (heuristic_type == "Euclidean") {
       return this.euclidean(this.x, this.y, map.goal.x, map.goal.y);
@@ -404,7 +411,9 @@ let divSearchTree;
 
 function preload() {
   map = new WorldMap(map_data);
+  // START FORMULATION 1: INITIAL STATE
   state = new AgentState(1, 1, "s");
+  // END FORMULATION 1
   let start = new SearchNode(state, null, null, null);
   history.push(start);
   explorer = new Explorer(start);
@@ -473,6 +482,7 @@ function startButton() {
   }
 }
 
+// START UCS SEARCH ALGORITHM
 async function GraphSearch(problem) {
   //Initialize the frontier  using the initlal state of the problem
   frontier = new PriorityQueue();
@@ -481,17 +491,19 @@ async function GraphSearch(problem) {
   frontier_count = 0
   //Initialize the explored set to be empty
   explored = {};
-
   st = "";
-  state = new AgentState(1, 1, "s");
-  historyWalk = [];
 
   //loop do
+  //if the fronteir is empty return failure 
   while (!frontier.isEmpty()) {
-    //if the fronteir is empty return failure
     //choose a leaf node and remove it from frontier
-    //console.log(frontier.printPQueue());
     let chosenNode = frontier.dequeue().element;
+
+    let xpos = chosenNode.x * cz + mz;
+    let ypos = chosenNode.y * cz + mz;
+    
+    circle(xpos + cz / 2, ypos + cz / 2, 10);
+
     //if the node contain a goal state then return solution
     if (chosenNode.x == map.goal.x && chosenNode.y == map.goal.y) {
       //console.log(Object.keys(explored));
@@ -510,6 +522,7 @@ async function GraphSearch(problem) {
       }
       redraw();
       divSearchTree.html(st);
+      chosenNode.state.render();
       return chosenNode;
     }
     //add the node to the explored set
@@ -524,26 +537,23 @@ async function GraphSearch(problem) {
       if (childNode.key() in explored) {
         continue;
       }
-      //console.log(frontier.items, childNode)
       //if in frontier keep the better node, that contain same state
-      //console.log(frontier.checkDupeChild(childNode))
-      if (frontier.checkDupeChild(childNode)) {
-          //console.log("dupe")
-        if(frontier.checkG(childNode)){
-          frontier = frontier.bringLowtoFront()
-          frontier.dequeue();
-        }
-      } else {
-        console.log("not dupe")
+      //console.log(frontier.items)
+      if (!frontier.checkContain(childNode)) {
         frontier.enqueue(childNode, childNode.g);
         frontier_count += 1;
+      } else {
+        console.log("in")
+        frontier.checkValue(childNode);
       }
     }
     await timeout(50);
   }
   return false;
 }
+// END SEARCH ALGORITHM
 
+// START GREEDY ALGORITHM
 async function GreedySearch(problem) {
   frontier = new PriorityQueue();
   console.log(frontier.items);
@@ -557,6 +567,12 @@ async function GreedySearch(problem) {
   while (true) {
     if (frontier.isEmpty()) return false;
     let choose = frontier.dequeue().element;
+
+    let xpos = choose.x * cz + mz;
+    let ypos = choose.y * cz + mz;
+    
+    circle(xpos + cz / 2, ypos + cz / 2, 10);
+    
     if (choose.x == map.goal.x && choose.y == map.goal.y) {
       console.log(explored);
       console.log(Object.keys(explored));
@@ -598,7 +614,9 @@ async function GreedySearch(problem) {
     await timeout(50);
   }
 }
+// END SEARCH ALGORITHM
 
+// START ASTAR ALGORITHM
 async function AstarSearch(problem) {
   frontier = new PriorityQueue();
   console.log(frontier.items);
@@ -612,6 +630,13 @@ async function AstarSearch(problem) {
   while (true) {
     if (frontier.isEmpty()) return false;
     let choose = frontier.dequeue().element;
+
+    let xpos = choose.x * cz + mz;
+    let ypos = choose.y * cz + mz;
+    
+    circle(xpos + cz / 2, ypos + cz / 2, 10);
+    
+    
     if (choose.x == map.goal.x && choose.y == map.goal.y) {
       console.log(explored);
       console.log(Object.keys(explored));
@@ -653,11 +678,13 @@ async function AstarSearch(problem) {
     await timeout(50);
   }
 }
+// END SEARCH ALGORITHM
 
 function timeout(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+//PRIORITY QUEUE
 class QElement {  
   constructor(element, priority) {
     this.element = element;
@@ -701,7 +728,7 @@ class PriorityQueue {
   isEmpty() {
     return this.items.length == 0;
   }
-  checkDupeChild(child){
+  checkContain(child){
     //console.log(child, this.items[0].element)
     for (var i = 0; i < this.items.length; i++) {
       //console.log(this.items[i].element, child);
@@ -710,36 +737,28 @@ class PriorityQueue {
     return false;
   }
 
-  checkG(object) {
+  checkValue(child) {
+    let status = false;
     for (var i = 0; i < this.items.length; i++) {
       if (
-        object.x == this.items[i].x &&
-        object.y == this.items[i].y &&
-        object.o == this.items[i].o &&
-        object.g < this.items[i].g
+        child.x == this.items[i].element.x &&
+        child.y == this.items[i].element.y &&
+        child.o == this.items[i].element.o 
       ) {
-        console.log("Lower")
-        return true
+        if(child.g <  this.items[i].element.g){
+          this.items[i].priority = '0';
+          status = true;
+        }
       }
     }
+    if(status == true){
+      console.log(this.printPQueue());
+      return true;
+    }
+    
     return false ;
   }
 
-  bringLowtoFront(object) {
-    console.log(object)
-    for (var i = 0; i < this.items.length; i++) {
-      if (
-        object.x == this.items[i].x &&
-        object.y == this.items[i].y &&
-        object.o == this.items[i].o &&
-        object.g < this.items[i].g
-      ) {
-        this.items[i].priority = 0;
-      }
-    }
-    console.log(this.items)
-    return this.items ;
-  }
 
   insertH(object) {
     for (var i = 0; i < this.items.length; i++) {
@@ -779,3 +798,4 @@ class PriorityQueue {
     return str; 
   } 
 }
+//PRIORITY QUEUE
